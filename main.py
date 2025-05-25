@@ -6,6 +6,11 @@ import time
 from datetime import datetime
 import logging
 import backoff
+import os
+from dotenv import load_dotenv
+
+# Load environment variables
+load_dotenv()
 
 # Configure logging
 logging.basicConfig(
@@ -107,8 +112,12 @@ class ComplaintAnalysisSystem:
         return report
 
 def main():
-    # Initialize the system with your API key
-    api_key = "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"
+    # Initialize the system with API key from environment variable
+    api_key = os.getenv('API_KEY')
+    if not api_key:
+        logging.error("API key not found in environment variables. Please check your .env file.")
+        return
+        
     system = ComplaintAnalysisSystem(api_key)
     
     try:
