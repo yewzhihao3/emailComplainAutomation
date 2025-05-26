@@ -1,6 +1,7 @@
 import requests
 import json
 import logging
+import re
 
 class AIAnalyzer:
     def __init__(self, api_key):
@@ -24,19 +25,50 @@ class AIAnalyzer:
             {"role": "user", "content": "Please provide your analysis in JSON format."}
         ]
 
+    def _extract_json_from_text(self, text: str) -> dict:
+        """Extract JSON from text content using multiple strategies."""
+        # Strategy 1: Find the most promising JSON-like structure
+        try:
+            # Look for content between the most outer curly braces
+            matches = re.findall(r'\{[^{]*"root_cause"[^}]*"suggested_solution"[^}]*\}', text)
+            for match in matches:
+                try:
+                    data = json.loads(match)
+                    if isinstance(data, dict) and 'root_cause' in data and 'suggested_solution' in data:
+                        return data
+                except json.JSONDecodeError:
+                    continue
+
+            # Strategy 2: Try to find the largest JSON structure
+            matches = re.findall(r'\{[^}]+\}', text)
+            for match in sorted(matches, key=len, reverse=True):
+                try:
+                    data = json.loads(match)
+                    if isinstance(data, dict) and 'root_cause' in data and 'suggested_solution' in data:
+                        return data
+                except json.JSONDecodeError:
+                    continue
+
+            # Strategy 3: Extract fields directly
+            root_cause_match = re.search(r'"root_cause"\s*:\s*"([^"]*)"', text)
+            solution_match = re.search(r'"suggested_solution"\s*:\s*"([^"]*)"', text)
+            
+            if root_cause_match and solution_match:
+                return {
+                    "root_cause": root_cause_match.group(1),
+                    "suggested_solution": solution_match.group(1)
+                }
+
+            raise ValueError("No valid JSON structure found")
+            
+        except Exception as e:
+            self.logger.error(f"JSON extraction error: {str(e)}")
+            raise ValueError(f"Failed to extract JSON: {str(e)}")
+
     def analyze_complaint(self, complaint_text):
         try:
             # Prepare the messages for the API
-            messages = [
-                {
-                    "role": "system",
-                    "content": "Analyze medical supply complaints. Output in JSON format with two fields:\n- root_cause: Clear description of the issue\n- suggested_solution: Steps to resolve the issue"
-                },
-                {
-                    "role": "user",
-                    "content": complaint_text
-                }
-            ]
+            messages = self._create_analysis_prompt(complaint_text)
 
             # Make API request
             response = requests.post(
@@ -57,38 +89,31 @@ class AIAnalyzer:
                     api_response = response.json()
                     content = api_response.get('choices', [{}])[0].get('message', {}).get('content', '')
                     
-                    # Try to extract JSON from the content
                     try:
-                        # Find JSON-like content between curly braces
-                        json_start = content.find('{')
-                        json_end = content.rfind('}') + 1
+                        return self._extract_json_from_text(content)
+                    except ValueError:
+                        # If JSON extraction fails, try to create a structured response from the content
+                        lines = content.split('\n')
+                        root_cause = ""
+                        solution = ""
                         
-                        if json_start != -1 and json_end != -1:
-                            json_content = content[json_start:json_end]
-                            analysis = json.loads(json_content)
-                        else:
-                            # If no JSON found, create a structured response
+                        for line in lines:
+                            line = line.strip()
+                            if "root cause" in line.lower() or "root_cause" in line.lower():
+                                root_cause = line.split(":", 1)[1].strip() if ":" in line else line
+                            elif "solution" in line.lower():
+                                solution = line.split(":", 1)[1].strip() if ":" in line else line
+                        
+                        if root_cause and solution:
                             return {
-                                "root_cause": "Invalid Response Format",
-                                "suggested_solution": "The AI response did not contain valid JSON. Please try again."
+                                "root_cause": root_cause,
+                                "suggested_solution": solution
                             }
-
-                    except json.JSONDecodeError:
-                        # If JSON parsing fails, create a structured error response
-                        self.logger.error(f"Failed to parse JSON from content: {content}")
+                        
                         return {
-                            "root_cause": "JSON Parsing Error",
-                            "suggested_solution": "Failed to parse the AI response as JSON. Please try again."
+                            "root_cause": "Parsing Error",
+                            "suggested_solution": "Could not extract structured data from the AI response. Original response: " + content[:200]
                         }
-
-                    # Validate the response has required fields
-                    if not isinstance(analysis, dict) or 'root_cause' not in analysis or 'suggested_solution' not in analysis:
-                        return {
-                            "root_cause": "Invalid Response Structure",
-                            "suggested_solution": f"Response missing required fields. Got: {str(analysis)[:200]}"
-                        }
-
-                    return analysis
 
                 except Exception as e:
                     self.logger.error(f"Error processing response: {str(e)}")
