@@ -11,7 +11,6 @@ class ProcessStatus(enum.Enum):
     PENDING = "Pending"
     SUCCESSFUL = "Successful"
     FAILED = "Failed"
-    CLOSED = "Closed"
 
 class ImportanceLevel(enum.Enum):
     LOW = "Low"
@@ -145,39 +144,7 @@ class Database:
         return ImportanceLevel.MEDIUM
 
     def _should_auto_close(self, complaint_category, description, root_cause, suggested_solution):
-        """Determine if a complaint should be automatically closed based on solution completeness"""
-        # Keywords that indicate the issue has been resolved or solution is complete
-        resolution_keywords = [
-            'replaced', 'refunded', 'exchanged', 'fixed', 'resolved', 'completed',
-            'delivered', 'shipped', 'corrected', 'addressed', 'handled', 'processed',
-            'compensated', 'reimbursed', 'apologized', 'acknowledged', 'investigated'
-        ]
-        
-        # Keywords that indicate immediate action was taken
-        immediate_action_keywords = [
-            'immediately', 'urgently', 'right away', 'asap', 'promptly',
-            'dispatched', 'sent', 'issued', 'provided', 'offered'
-        ]
-        
-        # Check if solution contains resolution keywords
-        solution_text = f"{suggested_solution}".lower()
-        
-        # Count resolution keywords in the solution
-        resolution_count = sum(1 for keyword in resolution_keywords if keyword in solution_text)
-        immediate_count = sum(1 for keyword in immediate_action_keywords if keyword in solution_text)
-        
-        # Auto-close if there are multiple resolution keywords or immediate action keywords
-        if resolution_count >= 2 or immediate_count >= 1:
-            return True
-        
-        # Auto-close for certain categories that typically get quick resolution
-        quick_resolution_categories = [
-            'delivery issue', 'billing issue', 'order issue', 'product issue'
-        ]
-        
-        if complaint_category.lower() in quick_resolution_categories and resolution_count >= 1:
-            return True
-        
+        # This function can remain for future use, but auto-close will just mark as SUCCESSFUL
         return False
 
     def update_complaint_analysis(self, complaint_id, root_cause, suggested_solution, importance_level=None):
@@ -187,24 +154,9 @@ class Database:
             if complaint:
                 complaint.root_cause = root_cause
                 complaint.suggested_solution = suggested_solution
-                
-                # Determine if complaint should be auto-closed
-                should_close = self._should_auto_close(
-                    complaint.complaint_category,
-                    complaint.description,
-                    root_cause,
-                    suggested_solution
-                )
-                
-                if should_close:
-                    complaint.processed = ProcessStatus.CLOSED
-                    self.logger.info(f"Auto-closing complaint {complaint_id} - solution provided")
-                else:
-                    complaint.processed = ProcessStatus.SUCCESSFUL
-                
+                complaint.processed = ProcessStatus.SUCCESSFUL
                 complaint.processed_at = datetime.utcnow()
-                
-                # Determine importance level if not provided
+                # ... importance level logic ...
                 if importance_level is None:
                     importance_level = self._determine_importance_level(
                         complaint.complaint_category,
@@ -212,14 +164,11 @@ class Database:
                         root_cause,
                         suggested_solution
                     )
-                
-                # Convert string to enum if needed
                 if isinstance(importance_level, str):
                     try:
                         importance_level = ImportanceLevel(importance_level)
                     except ValueError:
                         importance_level = ImportanceLevel.MEDIUM
-                
                 complaint.importance_level = importance_level
                 session.commit()
                 return True
@@ -228,37 +177,6 @@ class Database:
             session.rollback()
             self.logger.error(f"Error updating complaint analysis: {e}")
             return False
-        finally:
-            session.close()
-
-    def manually_close_complaint(self, complaint_id, closure_reason="Manually closed"):
-        """Manually close a complaint"""
-        session = self.Session()
-        try:
-            complaint = session.query(Complaint).filter_by(id=complaint_id).first()
-            if complaint:
-                complaint.processed = ProcessStatus.CLOSED
-                complaint.processed_at = datetime.utcnow()
-                # Add closure reason to suggested solution if not already present
-                if not complaint.suggested_solution or "closed" not in complaint.suggested_solution.lower():
-                    current_solution = complaint.suggested_solution or ""
-                    complaint.suggested_solution = f"{current_solution}\n\n{closure_reason}"
-                session.commit()
-                return True
-            return False
-        except Exception as e:
-            session.rollback()
-            self.logger.error(f"Error manually closing complaint: {e}")
-            return False
-        finally:
-            session.close()
-
-    def get_closed_complaints(self):
-        """Get all closed complaints"""
-        session = self.Session()
-        try:
-            complaints = session.query(Complaint).filter_by(processed=ProcessStatus.CLOSED).all()
-            return complaints
         finally:
             session.close()
 

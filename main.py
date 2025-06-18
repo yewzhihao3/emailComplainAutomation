@@ -117,14 +117,13 @@ class ComplaintAnalysisSystem:
         report = {
             'total_complaints': len(complaints),
             'processed_complaints': len([c for c in complaints if c.processed == ProcessStatus.SUCCESSFUL]),
-            'closed_complaints': len([c for c in complaints if c.processed == ProcessStatus.CLOSED]),
             'failed_complaints': len([c for c in complaints if c.processed == ProcessStatus.FAILED]),
             'pending_complaints': len([c for c in complaints if c.processed == ProcessStatus.PENDING]),
             'latest_analyses': []
         }
         
         for complaint in complaints:
-            if complaint.processed in [ProcessStatus.SUCCESSFUL, ProcessStatus.CLOSED]:
+            if complaint.processed == ProcessStatus.SUCCESSFUL:
                 report['latest_analyses'].append({
                     'id': complaint.id,
                     'category': complaint.complaint_category,
@@ -138,19 +137,6 @@ class ComplaintAnalysisSystem:
         
         # self.logger.info(f"Report generated: {report}")
         return report
-
-    def close_complaint_manually(self, complaint_id, closure_reason="Manually closed by user"):
-        """Manually close a specific complaint"""
-        success = self.db.manually_close_complaint(complaint_id, closure_reason)
-        if success:
-            self.logger.info(f"Manually closed complaint {complaint_id}")
-        else:
-            self.logger.error(f"Failed to manually close complaint {complaint_id}")
-        return success
-
-    def get_closed_complaints(self):
-        """Get all closed complaints"""
-        return self.db.get_closed_complaints()
 
 def main():
     # Initialize the system with API key from environment variable
