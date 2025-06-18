@@ -5,3 +5,5 @@ SQLAlchemy
 schedule
 pandas
 backoff
+gspread
+oauth2client

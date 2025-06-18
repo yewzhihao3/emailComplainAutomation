@@ -39,3 +39,7 @@ ENV/
 # Local development
 .env
 .env.local 
+
+# Ignore service account credentials
+credentials.json
+*.json
