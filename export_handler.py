@@ -1,6 +1,6 @@
 import csv
 from datetime import datetime
-from database import Database
+from database import Database, ProcessStatus, ImportanceLevel
 
 def export_to_csv():
     """
@@ -11,8 +11,15 @@ def export_to_csv():
     timestamp = datetime.now().strftime("%Y-%m-%d_%H%M%S")
     filename = f"complaints_export_{timestamp}.csv"
     
-    # Define CSV headers
-    headers = ['Complaint ID', 'Sender', 'Subject', 'Body', 'Received At', 'Root Cause', 'Suggested Solution', 'Processed At']
+    # Define CSV headers based on our current database schema, with separate columns for root causes and solutions
+    headers = [
+        'Complaint ID', 'Name', 'Email', 'Contact Number', 'Order ID', 
+        'Product Name', 'Purchase Date', 'Complaint Category', 'Description', 
+        'Photo Proof Link', 'Importance Level', 'Status', 'Received At', 
+        'Root Cause 1', 'Root Cause 2', 'Root Cause 3',
+        'Solution 1', 'Solution 2', 'Solution 3',
+        'Processed At'
+    ]
     
     try:
         # Initialize database
@@ -28,18 +35,47 @@ def export_to_csv():
             
             # Write data
             for complaint in complaints:
+                # Parse root causes and solutions into separate columns
+                def parse_points(val):
+                    if not val:
+                        return ["", "", ""]
+                    if isinstance(val, list):
+                        return val + ["", "", ""][:3-len(val)]
+                    # If it's a string, try to split by newlines or numbers
+                    import re
+                    # Try splitting by numbered points first
+                    points = re.findall(r'\d+\.\s*(.*?)(?=\n|$)', val)
+                    if len(points) == 3:
+                        return points
+                    # Otherwise, split by newlines
+                    split_points = [p.strip() for p in val.split('\n') if p.strip()]
+                    return split_points + ["", "", ""][:3-len(split_points)]
+                root_causes = parse_points(complaint.root_cause)
+                solutions = parse_points(complaint.suggested_solution)
                 writer.writerow([
                     complaint.id,
-                    complaint.sender,
-                    complaint.subject,
-                    complaint.body,
+                    complaint.name or '',
+                    complaint.email or '',
+                    complaint.contact_number or '',
+                    complaint.order_id or '',
+                    complaint.product_name or '',
+                    complaint.purchase_date or '',
+                    complaint.complaint_category or '',
+                    complaint.description or '',
+                    complaint.photo_proof_link or '',
+                    complaint.importance_level.value if complaint.importance_level else '',
+                    complaint.processed.value if complaint.processed else '',
                     complaint.received_at.isoformat() if complaint.received_at else '',
-                    complaint.root_cause if complaint.root_cause else '',
-                    complaint.suggested_solution if complaint.suggested_solution else '',
+                    root_causes[0],
+                    root_causes[1],
+                    root_causes[2],
+                    solutions[0],
+                    solutions[1],
+                    solutions[2],
                     complaint.processed_at.isoformat() if complaint.processed_at else ''
                 ])
         
-        print(f"\nSuccessfully exported complaints to {filename}")
+        print(f"\nSuccessfully exported {len(complaints)} complaints to {filename}")
         return True
     except Exception as e:
         print(f"\nError exporting to CSV: {str(e)}")

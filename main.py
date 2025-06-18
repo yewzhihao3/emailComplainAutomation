@@ -1,6 +1,7 @@
-from database import Database
+from database import Database, ProcessStatus, ImportanceLevel
 from ai_analyzer import AIAnalyzer
 from complain_extractor import get_complaints_data
+from export_handler import export_to_csv
 import schedule
 import time
 from datetime import datetime
@@ -50,9 +51,9 @@ class ComplaintAnalysisSystem:
                 self.logger.error(f"Failed to add complaint {complaint['id']}")
 
     @backoff.on_exception(backoff.expo, Exception, max_tries=3)
-    def _analyze_single_complaint(self, complaint):
+    def _analyze_single_complaint(self, complaint_text):
         """Process a single complaint with retry logic"""
-        analysis = self.analyzer.analyze_complaint(complaint.body)
+        analysis = self.analyzer.analyze_complaint(complaint_text)
         if "API Error" in analysis.get('root_cause', ''):
             raise Exception(f"API Error: {analysis.get('suggested_solution')}")
         return analysis
@@ -66,14 +67,34 @@ class ComplaintAnalysisSystem:
             self.logger.info(f"Processing complaint {complaint.id}")
             
             try:
-                # Analyze complaint using AI with retry logic
-                analysis = self._analyze_single_complaint(complaint)
+                # Create a comprehensive complaint text for analysis
+                complaint_text = f"""
+                Complaint Category: {complaint.complaint_category}
+                Product: {complaint.product_name}
+                Order ID: {complaint.order_id}
+                Description: {complaint.description}
+                """
                 
-                # Update database with analysis results
+                # Analyze complaint using AI with retry logic
+                analysis = self._analyze_single_complaint(complaint_text)
+                
+                # Convert lists to strings for database storage
+                root_cause = analysis.get('root_cause', 'Analysis failed')
+                suggested_solution = analysis.get('suggested_solution', 'No solution provided')
+                
+                # If root_cause is a list, convert it to a string
+                if isinstance(root_cause, list):
+                    root_cause = '\n'.join(root_cause)
+                
+                # If suggested_solution is a list, convert it to a string
+                if isinstance(suggested_solution, list):
+                    suggested_solution = '\n'.join(suggested_solution)
+                
+                # Update database with analysis results (importance level will be auto-determined)
                 success = self.db.update_complaint_analysis(
                     complaint.id,
-                    analysis.get('root_cause', 'Analysis failed'),
-                    analysis.get('suggested_solution', 'No solution provided')
+                    root_cause,
+                    suggested_solution
                 )
                 
                 if success:
@@ -83,10 +104,9 @@ class ComplaintAnalysisSystem:
                     
             except Exception as e:
                 self.logger.error(f"Failed to process complaint {complaint.id}: {str(e)}")
-                # Update database with error information
-                self.db.update_complaint_analysis(
+                # Mark complaint as failed with error information
+                self.db.mark_complaint_failed(
                     complaint.id,
-                    "Processing Error",
                     f"Failed to process after {self.max_retries} attempts: {str(e)}"
                 )
 
@@ -96,23 +116,41 @@ class ComplaintAnalysisSystem:
         
         report = {
             'total_complaints': len(complaints),
-            'processed_complaints': len([c for c in complaints if c.processed]),
-            'unprocessed_complaints': len([c for c in complaints if not c.processed]),
+            'processed_complaints': len([c for c in complaints if c.processed == ProcessStatus.SUCCESSFUL]),
+            'closed_complaints': len([c for c in complaints if c.processed == ProcessStatus.CLOSED]),
+            'failed_complaints': len([c for c in complaints if c.processed == ProcessStatus.FAILED]),
+            'pending_complaints': len([c for c in complaints if c.processed == ProcessStatus.PENDING]),
             'latest_analyses': []
         }
         
         for complaint in complaints:
-            if complaint.processed:
+            if complaint.processed in [ProcessStatus.SUCCESSFUL, ProcessStatus.CLOSED]:
                 report['latest_analyses'].append({
                     'id': complaint.id,
-                    'subject': complaint.subject,
+                    'category': complaint.complaint_category,
+                    'product': complaint.product_name,
                     'root_cause': complaint.root_cause,
                     'solution': complaint.suggested_solution,
+                    'importance': complaint.importance_level.value if complaint.importance_level else 'Unknown',
+                    'status': complaint.processed.value,
                     'processed_at': complaint.processed_at.isoformat() if complaint.processed_at else None
                 })
         
         self.logger.info(f"Report generated: {report}")
         return report
+
+    def close_complaint_manually(self, complaint_id, closure_reason="Manually closed by user"):
+        """Manually close a specific complaint"""
+        success = self.db.manually_close_complaint(complaint_id, closure_reason)
+        if success:
+            self.logger.info(f"Manually closed complaint {complaint_id}")
+        else:
+            self.logger.error(f"Failed to manually close complaint {complaint_id}")
+        return success
+
+    def get_closed_complaints(self):
+        """Get all closed complaints"""
+        return self.db.get_closed_complaints()
 
 def main():
     # Initialize the system with API key from environment variable
@@ -127,17 +165,36 @@ def main():
         # Load complaints from Google Sheets
         system.load_complaints_data()
         
-        # Schedule regular processing
-        schedule.every(1).hours.do(system.process_complaints)
-        schedule.every(6).hours.do(system.generate_report)
-        
-        # Initial processing
+        # Process all complaints once
         system.process_complaints()
         
-        # Keep the script running
+        # Generate final report
+        report = system.generate_report()
+        
+        # Log completion
+        logging.info("Complaint processing completed successfully!")
+        logging.info(f"Final report: {report}")
+        
+        # Ask user if they want to export CSV
         while True:
-            schedule.run_pending()
-            time.sleep(60)
+            user_input = input("\nWould you like to export the complaints to CSV? (y/n): ").lower()
+            
+            if user_input in ['y', 'yes']:
+                logging.info("Exporting complaints to CSV...")
+                success = export_to_csv()
+                if success:
+                    logging.info("CSV export completed successfully!")
+                else:
+                    logging.error("CSV export failed!")
+                break
+            elif user_input in ['n', 'no']:
+                logging.info("CSV export skipped.")
+                break
+            else:
+                print("Please enter 'y' or 'n'")
+        
+        logging.info("System will now exit.")
+        
     except KeyboardInterrupt:
         logging.info("System shutdown requested. Stopping gracefully...")
     except Exception as e:

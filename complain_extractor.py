@@ -2,6 +2,7 @@ import gspread
 from oauth2client.service_account import ServiceAccountCredentials
 from datetime import datetime
 import uuid
+import json
 
 # Set up the scope and credentials
 scope = [
@@ -25,23 +26,26 @@ def get_complaints_data():
     }
     
     for record in data:
-        # Generate a unique ID for each complaint
         complaint_id = f"COMP-{str(uuid.uuid4())[:8]}"
-        
-        # Format the complaint data
+        # Map fields from Google Sheet to database fields
         complaint = {
             "id": complaint_id,
-            "sender": record.get("Email", "unknown@email.com"),  # Adjust field name as needed
-            "subject": record.get("Subject", "No Subject"),      # Adjust field name as needed
-            "body": record.get("Message", ""),                  # Adjust field name as needed
-            "received_at": datetime.now().isoformat()  # You might want to get this from the sheet if available
+            "name": record.get("Name ", ""),
+            "email": record.get("Email", ""),
+            "contact_number": record.get("Contact Number", ""),
+            "order_id": record.get("Order ID / Reference No.  ", ""),
+            "product_name": record.get("Product Name / Batch No.  ", ""),
+            "purchase_date": record.get("Date of Purchase / Delivery  ", ""),
+            "complaint_category": record.get("Complaint Category  ", ""),
+            "description": record.get("Detailed Description  ", ""),
+            "photo_proof_link": record.get("Upload photo/video proof (via Google Drive link)  ", ""),
+            "importance_level": None,  # To be filled by AI
+            "received_at": datetime.now().isoformat()
         }
         formatted_complaints["complaints"].append(complaint)
     
     return formatted_complaints
 
 if __name__ == "__main__":
-    # Test the data retrieval
     complaints = get_complaints_data()
-    for i, complaint in enumerate(complaints["complaints"], 1):
-        print(f"{i}. {complaint}")
+    print(json.dumps(complaints, indent=2))
