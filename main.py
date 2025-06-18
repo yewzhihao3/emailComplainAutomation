@@ -1,6 +1,6 @@
 from database import Database
 from ai_analyzer import AIAnalyzer
-from mock_data import MOCK_COMPLAINTS
+from complain_extractor import get_complaints_data
 import schedule
 import time
 from datetime import datetime
@@ -30,8 +30,8 @@ class ComplaintAnalysisSystem:
         self.max_retries = 3
         self.retry_delay = 5  # seconds
 
-    def load_mock_data(self):
-        """Load mock complaints into the database"""
+    def load_complaints_data(self):
+        """Load complaints from Google Sheets into the database"""
         # Clear existing data first
         if self.db.clear_all_data():
             self.logger.info("Cleared existing data from database")
@@ -39,7 +39,10 @@ class ComplaintAnalysisSystem:
             self.logger.error("Failed to clear existing data from database")
             return
 
-        for complaint in MOCK_COMPLAINTS['complaints']:
+        # Get complaints from Google Sheets
+        complaints_data = get_complaints_data()
+        
+        for complaint in complaints_data['complaints']:
             success = self.db.add_complaint(complaint)
             if success:
                 self.logger.info(f"Added complaint {complaint['id']} to database")
@@ -121,8 +124,8 @@ def main():
     system = ComplaintAnalysisSystem(api_key)
     
     try:
-        # Load mock data
-        system.load_mock_data()
+        # Load complaints from Google Sheets
+        system.load_complaints_data()
         
         # Schedule regular processing
         schedule.every(1).hours.do(system.process_complaints)
