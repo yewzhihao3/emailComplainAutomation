@@ -136,7 +136,7 @@ class ComplaintAnalysisSystem:
                     'processed_at': complaint.processed_at.isoformat() if complaint.processed_at else None
                 })
         
-        self.logger.info(f"Report generated: {report}")
+        # self.logger.info(f"Report generated: {report}")
         return report
 
     def close_complaint_manually(self, complaint_id, closure_reason="Manually closed by user"):

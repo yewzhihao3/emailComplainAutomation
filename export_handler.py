@@ -1,12 +1,15 @@
 import csv
 from datetime import datetime
 from database import Database, ProcessStatus, ImportanceLevel
+import logging
 
 def export_to_csv():
     """
     Export complaints data to a CSV file.
     The file will be named 'complaints_export_YYYY-MM-DD_HHMMSS.csv'
     """
+    logger = logging.getLogger(__name__)
+    logger.info('Export in progress...')
     # Generate filename with timestamp
     timestamp = datetime.now().strftime("%Y-%m-%d_%H%M%S")
     filename = f"complaints_export_{timestamp}.csv"
@@ -74,11 +77,10 @@ def export_to_csv():
                     solutions[2],
                     complaint.processed_at.isoformat() if complaint.processed_at else ''
                 ])
-        
-        print(f"\nSuccessfully exported {len(complaints)} complaints to {filename}")
+        logger.info('Export complete.')
         return True
     except Exception as e:
-        print(f"\nError exporting to CSV: {str(e)}")
+        logger.error(f"Error exporting to CSV: {str(e)}")
         return False
 
 def main():
@@ -89,7 +91,6 @@ def main():
             export_to_csv()
             break
         elif user_input in ['n', 'no']:
-            print("\nExport cancelled.")
             break
         else:
             print("\nPlease enter 'y' or 'n'")

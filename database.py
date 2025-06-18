@@ -55,7 +55,7 @@ class Database:
             return True
         except Exception as e:
             session.rollback()
-            print(f"Error clearing database: {e}")
+            self.logger.error(f"Error clearing database: {e}")
             return False
         finally:
             session.close()
@@ -96,7 +96,7 @@ class Database:
             return True
         except Exception as e:
             session.rollback()
-            print(f"Error adding complaint: {e}")
+            self.logger.error(f"Error adding complaint: {e}")
             return False
         finally:
             session.close()
@@ -226,7 +226,7 @@ class Database:
             return False
         except Exception as e:
             session.rollback()
-            print(f"Error updating complaint analysis: {e}")
+            self.logger.error(f"Error updating complaint analysis: {e}")
             return False
         finally:
             session.close()
@@ -248,7 +248,7 @@ class Database:
             return False
         except Exception as e:
             session.rollback()
-            print(f"Error manually closing complaint: {e}")
+            self.logger.error(f"Error manually closing complaint: {e}")
             return False
         finally:
             session.close()
@@ -277,7 +277,7 @@ class Database:
             return False
         except Exception as e:
             session.rollback()
-            print(f"Error marking complaint as failed: {e}")
+            self.logger.error(f"Error marking complaint as failed: {e}")
             return False
         finally:
             session.close()

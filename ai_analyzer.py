@@ -47,15 +47,15 @@ IMPORTANT:
         if error_message:
             messages.append({"role": "user", "content": f"Your response was incorrect. {error_message}. You MUST respond with EXACTLY the JSON object containing 3 numbered points for each section."})
         
-        # Log the complete prompt for debugging
-        self.logger.info("=== AI Prompt ===")
-        self.logger.info("System Message:")
-        self.logger.info(messages[0]["content"])
-        self.logger.info("\nUser Messages:")
-        for msg in messages[1:]:
-            if msg["role"] == "user":
-                self.logger.info(msg["content"])
-        self.logger.info("===============")
+        # Remove detailed prompt logging for production
+        # self.logger.info("=== AI Prompt ===")
+        # self.logger.info("System Message:")
+        # self.logger.info(messages[0]["content"])
+        # self.logger.info("\nUser Messages:")
+        # for msg in messages[1:]:
+        #     if msg["role"] == "user":
+        #         self.logger.info(msg["content"])
+        # self.logger.info("===============")
         
         return messages
 
@@ -165,10 +165,10 @@ IMPORTANT:
                             time.sleep(self.retry_delay)
                             continue
 
-                        # Log the raw response for debugging
-                        self.logger.info("=== AI Response ===")
-                        self.logger.info(content)
-                        self.logger.info("=================")
+                        # Remove detailed AI response logging for production
+                        # self.logger.info("=== AI Response ===")
+                        # self.logger.info(content)
+                        # self.logger.info("=================")
                         
                         result = self._extract_json_from_text(content)
                         
