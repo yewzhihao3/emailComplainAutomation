@@ -211,7 +211,7 @@ class UIManager:
             print(f"❌ Error generating chart: {e}")
 
     def show_sample_complaints(self, db):
-        """Show sample complaints from the database"""
+        """Show sample complaints from the database and allow searching by COMP ID or ORDER ID"""
         complaints = db.get_all_complaints()
         
         if not complaints:
@@ -234,6 +234,43 @@ class UIManager:
             if complaint.root_cause:
                 print(f"  Root Cause: {complaint.root_cause[:100]}...")
             print("-" * 30)
+        
+        # Ask if user wants to search for a specific complaint
+        try:
+            search_choice = input("\nWould you like to search for a specific complaint by COMP ID or ORDER ID? (y/n): ").lower().strip()
+            if search_choice in ['y', 'yes']:
+                search_id = input("Enter COMP ID (e.g., COMP-000001) or ORDER ID: ").strip()
+                found = None
+                for c in complaints:
+                    if c.id.lower() == search_id.lower() or (c.order_id and c.order_id.lower() == search_id.lower()):
+                        found = c
+                        break
+                if found:
+                    print("\n🔎 Complaint Found:")
+                    print("=" * 50)
+                    print(f"ID: {found.id}")
+                    print(f"Order ID: {found.order_id}")
+                    print(f"Name: {found.name}")
+                    print(f"Email: {found.email}")
+                    print(f"Contact Number: {found.contact_number}")
+                    print(f"Product: {found.product_name}")
+                    print(f"Purchase Date: {found.purchase_date}")
+                    print(f"Category: {found.complaint_category}")
+                    print(f"Description: {found.description}")
+                    print(f"Photo Proof Link: {found.photo_proof_link}")
+                    print(f"Importance: {found.importance_level.value if found.importance_level else 'Unknown'}")
+                    print(f"Received At: {found.received_at}")
+                    print(f"Status: {found.processed.value}")
+                    print(f"Processed At: {found.processed_at}")
+                    print(f"Root Cause: {found.root_cause}")
+                    print(f"Suggested Solution: {found.suggested_solution}")
+                    print("=" * 50)
+                else:
+                    print("❌ Complaint not found with that COMP ID or ORDER ID.")
+        except KeyboardInterrupt:
+            print("\nSearch cancelled.")
+        except Exception as e:
+            print(f"❌ Error during search: {e}")
 
     def show_welcome_message(self):
         """Show the welcome message"""
