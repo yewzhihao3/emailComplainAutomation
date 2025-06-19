@@ -141,10 +141,17 @@ class UIManager:
         try:
             import matplotlib.pyplot as plt
             import pandas as pd
+            import os
             from collections import Counter
             from datetime import datetime
             
             print("\n📈 Generating summary chart...")
+            
+            # Create charts folder if it doesn't exist
+            charts_folder = "charts"
+            if not os.path.exists(charts_folder):
+                os.makedirs(charts_folder)
+                print(f"📁 Created charts folder: {charts_folder}")
             
             # Create a simple but informative chart
             fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 6))
@@ -197,10 +204,11 @@ class UIManager:
             
             plt.tight_layout()
             
-            # Save the chart
-            filename = f'complaint_summary_{datetime.now().strftime("%Y%m%d_%H%M%S")}.png'
+            # Save the chart with timestamp
+            timestamp = datetime.now().strftime("%Y-%m-%d_%H%M%S")
+            filename = os.path.join(charts_folder, f'complaint_summary_{timestamp}.png')
             plt.savefig(filename, dpi=300, bbox_inches='tight')
-            print(f"✅ Chart saved as {filename}")
+            print(f"✅ Chart saved as: {filename}")
             
             # Show the plot
             plt.show()

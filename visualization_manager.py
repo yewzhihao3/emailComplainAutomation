@@ -1,6 +1,7 @@
 import matplotlib.pyplot as plt
 import pandas as pd
 import seaborn as sns
+import os
 from datetime import datetime
 from database import Complaint, ProcessStatus
 import logging
@@ -18,6 +19,12 @@ class VisualizationManager:
         if not complaints:
             print("ℹ️ No complaints found in database.")
             return
+        
+        # Create charts folder if it doesn't exist
+        charts_folder = "charts"
+        if not os.path.exists(charts_folder):
+            os.makedirs(charts_folder)
+            self.logger.info(f"Created charts folder: {charts_folder}")
         
         # Convert to DataFrame for easier analysis
         data = []
@@ -94,8 +101,9 @@ class VisualizationManager:
         
         plt.tight_layout()
         
-        # Save the visualization
-        filename = f'complaint_analysis_{datetime.now().strftime("%Y%m%d_%H%M%S")}.png'
+        # Save the visualization with timestamp
+        timestamp = datetime.now().strftime("%Y-%m-%d_%H%M%S")
+        filename = os.path.join(charts_folder, f'complaint_analysis_dashboard_{timestamp}.png')
         plt.savefig(filename, dpi=300, bbox_inches='tight')
         print(f"✅ Visualization saved as: {filename}")
         

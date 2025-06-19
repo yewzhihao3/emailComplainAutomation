@@ -1,4 +1,5 @@
 import csv
+import os
 from datetime import datetime
 from database import Database, ProcessStatus, ImportanceLevel
 import logging
@@ -6,13 +7,20 @@ import logging
 def export_to_csv():
     """
     Export complaints data to a CSV file.
-    The file will be named 'complaints_export_YYYY-MM-DD_HHMMSS.csv'
+    The file will be saved in an 'exports' folder with timestamp-based naming.
     """
     logger = logging.getLogger(__name__)
     logger.info('Export in progress...')
+    
+    # Create exports folder if it doesn't exist
+    exports_folder = "exports"
+    if not os.path.exists(exports_folder):
+        os.makedirs(exports_folder)
+        logger.info(f"Created exports folder: {exports_folder}")
+    
     # Generate filename with timestamp
     timestamp = datetime.now().strftime("%Y-%m-%d_%H%M%S")
-    filename = f"complaints_export_{timestamp}.csv"
+    filename = os.path.join(exports_folder, f"complaints_export_{timestamp}.csv")
     
     # Define CSV headers based on our current database schema, with separate columns for root causes and solutions
     headers = [
@@ -77,10 +85,12 @@ def export_to_csv():
                     solutions[2],
                     complaint.processed_at.isoformat() if complaint.processed_at else ''
                 ])
-        logger.info('Export complete.')
+        logger.info(f'Export complete. File saved as: {filename}')
+        print(f"✅ CSV export saved successfully: {filename}")
         return True
     except Exception as e:
         logger.error(f"Error exporting to CSV: {str(e)}")
+        print(f"❌ Error exporting to CSV: {str(e)}")
         return False
 
 def main():
