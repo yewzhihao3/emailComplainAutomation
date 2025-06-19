@@ -4,6 +4,9 @@ from sqlalchemy.orm import sessionmaker
 from datetime import datetime
 import enum
 import logging
+import sqlite3
+import os
+from typing import List, Optional
 
 Base = declarative_base()
 
@@ -39,11 +42,20 @@ class Complaint(Base):
     processed_at = Column(DateTime)
 
 class Database:
-    def __init__(self, db_path='complaints.db'):
-        self.engine = create_engine(f'sqlite:///{db_path}')
+    def __init__(self, db_path='data/complaints.db'):
+        # Create data folder if it doesn't exist
+        data_folder = os.path.dirname(db_path)
+        if data_folder and not os.path.exists(data_folder):
+            os.makedirs(data_folder)
+        
+        self.db_path = db_path
+        self.init_database()
+        self.logger = logging.getLogger(__name__)
+
+    def init_database(self):
+        self.engine = create_engine(f'sqlite:///{self.db_path}')
         Base.metadata.create_all(self.engine)
         self.Session = sessionmaker(bind=self.engine)
-        self.logger = logging.getLogger(__name__)
 
     def clear_all_data(self):
         """Clear all data from the complaints table"""

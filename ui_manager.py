@@ -17,7 +17,8 @@ class UIManager:
         print("7. Process PENDING & FAILED complaints 🔄")
         print("8. Mark ALL as unprocessed (reset status) ⚠️")
         print("9. Load and process ALL complaints (⚠️ full refresh)")
-        print("10. Exit")
+        print("10. Manage logs 📝")
+        print("11. Exit")
         print("-" * 50)
 
     def confirm_full_refresh(self):
@@ -300,8 +301,116 @@ class UIManager:
         print(f"✅ {message}")
 
     def show_info_message(self, message):
-        """Show info message"""
-        print(f"ℹ️ {message}")
+        """Show an info message"""
+        print(f"\nℹ️  {message}")
+
+    def manage_logs(self):
+        """Manage application logs"""
+        import os
+        import glob
+        from datetime import datetime
+        
+        logs_folder = "logs"
+        
+        print("\n📝 Log Management")
+        print("=" * 40)
+        
+        if not os.path.exists(logs_folder):
+            print("ℹ️  No logs folder found.")
+            return
+        
+        # Show current log file info
+        current_log = os.path.join(logs_folder, "complaint_analysis.log")
+        if os.path.exists(current_log):
+            file_size = os.path.getsize(current_log)
+            file_size_mb = file_size / (1024 * 1024)
+            modified_time = datetime.fromtimestamp(os.path.getmtime(current_log))
+            
+            print(f"📄 Current log file: complaint_analysis.log")
+            print(f"   Size: {file_size_mb:.2f} MB")
+            print(f"   Last modified: {modified_time.strftime('%Y-%m-%d %H:%M:%S')}")
+            
+            # Show last few lines
+            try:
+                with open(current_log, 'r', encoding='utf-8') as f:
+                    lines = f.readlines()
+                    if lines:
+                        print(f"\n📋 Last 5 log entries:")
+                        print("-" * 30)
+                        for line in lines[-5:]:
+                            print(f"   {line.strip()}")
+            except Exception as e:
+                print(f"   ❌ Error reading log file: {e}")
+        else:
+            print("ℹ️  No current log file found.")
+        
+        # Show backup log files
+        backup_logs = glob.glob(os.path.join(logs_folder, "complaint_analysis.log.*"))
+        if backup_logs:
+            print(f"\n📚 Backup log files ({len(backup_logs)}):")
+            for backup in sorted(backup_logs):
+                file_size = os.path.getsize(backup)
+                file_size_mb = file_size / (1024 * 1024)
+                modified_time = datetime.fromtimestamp(os.path.getmtime(backup))
+                print(f"   {os.path.basename(backup)} - {file_size_mb:.2f} MB - {modified_time.strftime('%Y-%m-%d %H:%M:%S')}")
+        
+        # Show old timestamp-based logs
+        old_logs = glob.glob(os.path.join(logs_folder, "complaint_analysis_*.log"))
+        if old_logs:
+            print(f"\n🗑️  Old timestamp-based logs ({len(old_logs)}):")
+            for old_log in sorted(old_logs):
+                file_size = os.path.getsize(old_log)
+                file_size_mb = file_size / (1024 * 1024)
+                modified_time = datetime.fromtimestamp(os.path.getmtime(old_log))
+                print(f"   {os.path.basename(old_log)} - {file_size_mb:.2f} MB - {modified_time.strftime('%Y-%m-%d %H:%M:%S')}")
+        
+        print("\n" + "=" * 40)
+        
+        # Log management options
+        print("\nOptions:")
+        print("1. View full current log")
+        print("2. Clean up old timestamp-based logs")
+        print("3. Back to main menu")
+        
+        try:
+            choice = input("\nEnter your choice (1-3): ").strip()
+            
+            if choice == "1":
+                if os.path.exists(current_log):
+                    print(f"\n📄 Full log content of {current_log}:")
+                    print("=" * 60)
+                    try:
+                        with open(current_log, 'r', encoding='utf-8') as f:
+                            content = f.read()
+                            if content:
+                                print(content)
+                            else:
+                                print("Log file is empty.")
+                    except Exception as e:
+                        print(f"❌ Error reading log file: {e}")
+                else:
+                    print("❌ No current log file found.")
+                    
+            elif choice == "2":
+                if old_logs:
+                    confirm = input(f"\n🗑️  Delete {len(old_logs)} old log files? (y/n): ").lower().strip()
+                    if confirm in ['y', 'yes']:
+                        deleted_count = 0
+                        for old_log in old_logs:
+                            try:
+                                os.remove(old_log)
+                                deleted_count += 1
+                                print(f"   Deleted: {os.path.basename(old_log)}")
+                            except Exception as e:
+                                print(f"   Failed to delete {os.path.basename(old_log)}: {e}")
+                        print(f"✅ Deleted {deleted_count} old log files.")
+                else:
+                    print("ℹ️  No old log files to clean up.")
+                    
+        except KeyboardInterrupt:
+            print("\n❌ Operation cancelled.")
+        except Exception as e:
+            print(f"❌ Error: {e}")
 
     def get_user_choice(self, min_choice, max_choice):
         """Get user choice with validation"""

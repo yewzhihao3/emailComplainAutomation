@@ -8,20 +8,86 @@ from ui_manager import UIManager
 from datetime import datetime
 import logging
 import os
+import sys
 from dotenv import load_dotenv
 
+# Load environment variables - handle both development and frozen executable
+def load_env_file():
+    """Load .env file from appropriate location based on environment"""
+    # Try multiple possible locations for the .env file
+    possible_paths = [
+        'config/.env',           # Development environment
+        '.env',                  # Root directory fallback
+        os.path.join(os.path.dirname(sys.executable), 'config', '.env'),  # Frozen executable
+        os.path.join(os.path.dirname(sys.executable), '.env'),            # Frozen executable fallback
+    ]
+    
+    for path in possible_paths:
+        if os.path.exists(path):
+            load_dotenv(path)
+            print(f"✅ Loaded .env from: {path}")
+            return True
+    
+    print("❌ No .env file found in any of the expected locations")
+    return False
+
 # Load environment variables
-load_dotenv()
+load_env_file()
 
 # Configure logging
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(levelname)s - %(message)s',
-    handlers=[
-        logging.FileHandler('complaint_analysis.log'),
-        logging.StreamHandler()
-    ]
-)
+def setup_logging():
+    # Create logs folder if it doesn't exist
+    logs_folder = "logs"
+    if not os.path.exists(logs_folder):
+        os.makedirs(logs_folder)
+    
+    # Use a single log file with rotation instead of timestamp-based naming
+    log_filename = os.path.join(logs_folder, 'complaint_analysis.log')
+    
+    # Configure logging with rotation (max 5MB per file, keep 3 backup files)
+    from logging.handlers import RotatingFileHandler
+    
+    logging.basicConfig(
+        level=logging.INFO,
+        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+        handlers=[
+            RotatingFileHandler(
+                log_filename, 
+                maxBytes=5*1024*1024,  # 5MB
+                backupCount=3
+            ),
+            logging.StreamHandler(sys.stdout)
+        ]
+    )
+    
+    # Log startup information
+    logger = logging.getLogger(__name__)
+    logger.info("=" * 50)
+    logger.info("Application started")
+    logger.info(f"Log file: {log_filename}")
+    logger.info("=" * 50)
+
+def cleanup_old_logs():
+    """Clean up old timestamp-based log files"""
+    logs_folder = "logs"
+    if not os.path.exists(logs_folder):
+        return
+    
+    import glob
+    # Find old timestamp-based log files
+    old_logs = glob.glob(os.path.join(logs_folder, "complaint_analysis_*.log"))
+    
+    if old_logs:
+        print(f"\n🗑️ Found {len(old_logs)} old log files. Cleaning up...")
+        for log_file in old_logs:
+            try:
+                os.remove(log_file)
+                print(f"   Deleted: {os.path.basename(log_file)}")
+            except Exception as e:
+                print(f"   Failed to delete {os.path.basename(log_file)}: {e}")
+        print("✅ Cleanup completed!")
+    else:
+        print("\n✅ No old log files found.")
 
 class ComplaintAnalysisSystem:
     def __init__(self, api_key):
@@ -159,11 +225,17 @@ class ComplaintAnalysisSystem:
 def main():
     """Main application with interactive menu"""
     # Initialize the system with API key from environment variable
-    api_key = os.getenv('API_KEY')
+    api_key = os.getenv('OPENAI_API_KEY')
     if not api_key:
         print("❌ API key not found in environment variables. Please check your .env file.")
         return
         
+    # Setup logging first
+    setup_logging()
+    
+    # Clean up old timestamp-based logs on startup
+    cleanup_old_logs()
+    
     system = ComplaintAnalysisSystem(api_key)
     
     # Show welcome message
@@ -174,7 +246,7 @@ def main():
             system.ui.show_menu()
             
             try:
-                choice = system.ui.get_user_choice(1, 10)
+                choice = system.ui.get_user_choice(1, 11)
                 
                 if choice == "exit":
                     break
@@ -193,6 +265,7 @@ def main():
                 
                 elif choice == '3':
                     # Generate visualizations
+                    print("\n📈 Generating visualizations...")
                     system.visualizer.generate_complaint_dashboard()
                 
                 elif choice == '4':
@@ -209,43 +282,41 @@ def main():
                 
                 elif choice == '7':
                     # Process PENDING & FAILED complaints
+                    print("\n🔄 Processing pending and failed complaints...")
                     system.processor.process_pending_and_failed_complaints()
                 
                 elif choice == '8':
-                    # Mark ALL as unprocessed (reset status)
+                    # Reset processed complaints
                     if system.ui.confirm_reset_operation():
                         system.reset_processed_complaints()
                 
                 elif choice == '9':
-                    # Load and process ALL complaints (full refresh)
+                    # Full refresh
                     if system.ui.confirm_full_refresh():
-                        print("\n🔄 Starting full refresh...")
-                        if system.clear_database():
-                            system.load_complaints_data()
-                            system.processor.process_complaints()
-                            stats = system.db.get_database_stats()
-                            print(f"\n✅ Full refresh completed!")
-                            print(f"📊 Summary: {stats['total']} complaints processed, {stats['successful']} successful, {stats['failed']} failed")
-                        else:
-                            print("❌ Failed to clear database. Operation cancelled.")
+                        system.clear_database()
+                        system.load_complaints_data()
+                        system.processor.process_complaints()
                 
                 elif choice == '10':
-                    system.ui.show_goodbye_message()
+                    # Manage logs
+                    system.ui.manage_logs()
+                
+                elif choice == '11':
+                    # Exit
                     break
-                    
+                
             except KeyboardInterrupt:
-                print("\n\n👋 Goodbye!")
-                break
+                print("\n\n⚠️  Operation cancelled by user.")
+                continue
             except Exception as e:
-                system.ui.show_error_message(e)
-                logging.error(f"Error in main menu: {e}")
-        
+                print(f"\n❌ An error occurred: {e}")
+                system.ui.show_error_message(str(e))
+                continue
+    
     except KeyboardInterrupt:
-        print("\n\n👋 System shutdown requested. Stopping gracefully...")
-    except Exception as e:
-        system.ui.show_error_message(e)
-        logging.error(f"Unexpected error: {str(e)}")
-        raise
+        print("\n\n👋 Goodbye!")
+    finally:
+        system.ui.show_goodbye_message()
 
 if __name__ == "__main__":
     main() 

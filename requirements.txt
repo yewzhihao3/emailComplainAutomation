@@ -6,6 +6,7 @@ schedule
 pandas
 backoff
 gspread
+gspread-dataframe
 oauth2client
 matplotlib
 seaborn
