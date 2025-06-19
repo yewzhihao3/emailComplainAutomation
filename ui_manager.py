@@ -80,16 +80,135 @@ class UIManager:
             return False
 
     def show_statistics(self, db):
-        """Show current database statistics"""
+        """Show current database statistics with enhanced details"""
         stats = db.get_database_stats()
+        complaints = db.get_all_complaints()
         
-        print("\n📊 Current Database Statistics:")
-        print("=" * 30)
-        print(f"Total complaints: {stats['total']}")
-        print(f"Pending: {stats['pending']}")
-        print(f"Successfully processed: {stats['successful']}")
-        print(f"Failed: {stats['failed']}")
-        print(f"Processing success rate: {stats['processed_percentage']}%")
+        print("\n📊 Current Complaint Summary:")
+        print("=" * 40)
+        print(f"• Total: {stats['total']}")
+        print(f"• Processed: {stats['successful']}")
+        print(f"• Pending: {stats['pending']}")
+        print(f"• Failed: {stats['failed']}")
+        print(f"• Success Rate: {stats['processed_percentage']}%")
+        
+        # Calculate additional statistics
+        if complaints:
+            # Most common category
+            categories = [c.complaint_category for c in complaints if c.complaint_category]
+            if categories:
+                from collections import Counter
+                category_counts = Counter(categories)
+                most_common_category = category_counts.most_common(1)[0][0]
+                print(f"• Most common category: \"{most_common_category}\"")
+            
+            # Average importance level
+            importance_levels = [c.importance_level.value for c in complaints if c.importance_level]
+            if importance_levels:
+                from collections import Counter
+                importance_counts = Counter(importance_levels)
+                most_common_importance = importance_counts.most_common(1)[0][0]
+                print(f"• Most common importance level: {most_common_importance}")
+            
+            # Processing time statistics (if any complaints are processed)
+            processed_complaints = [c for c in complaints if c.processed_at and c.received_at]
+            if processed_complaints:
+                import datetime
+                processing_times = []
+                for complaint in processed_complaints:
+                    if complaint.processed_at and complaint.received_at:
+                        processing_time = complaint.processed_at - complaint.received_at
+                        processing_times.append(processing_time.total_seconds() / 3600)  # Convert to hours
+                
+                if processing_times:
+                    avg_processing_time = sum(processing_times) / len(processing_times)
+                    print(f"• Avg. processing time: {avg_processing_time:.1f} hours")
+        
+        print("=" * 40)
+        
+        # Ask if user wants to see a chart
+        try:
+            chart_choice = input("\n[Optional] Would you like to view this as a chart? (y/n): ").lower().strip()
+            if chart_choice in ['y', 'yes']:
+                self._generate_summary_chart(db, stats, complaints)
+        except KeyboardInterrupt:
+            print("\nChart generation cancelled.")
+        except Exception as e:
+            print(f"❌ Error generating chart: {e}")
+
+    def _generate_summary_chart(self, db, stats, complaints):
+        """Generate a summary chart for the statistics"""
+        try:
+            import matplotlib.pyplot as plt
+            import pandas as pd
+            from collections import Counter
+            from datetime import datetime
+            
+            print("\n📈 Generating summary chart...")
+            
+            # Create a simple but informative chart
+            fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(12, 6))
+            fig.suptitle('Complaint Processing Summary', fontsize=16, fontweight='bold')
+            
+            # Chart 1: Processing Status Donut Chart (with enhancements)
+            status_data = [stats['successful'], stats['pending'], stats['failed']]
+            status_labels = ['Processed', 'Pending', 'Failed']
+            colors = ['#2ecc71', '#f39c12', '#e74c3c']
+            
+            # Only show nonzero statuses
+            filtered = [(label, value, color) for label, value, color in zip(status_labels, status_data, colors) if value > 0]
+            if filtered:
+                labels, values, pie_colors = zip(*filtered)
+                wedges, texts, autotexts = ax1.pie(
+                    values, labels=labels, autopct='%1.1f%%', colors=pie_colors, startangle=90, wedgeprops=dict(width=0.4)
+                )
+                # Add center label if only one status
+                if len(values) == 1:
+                    ax1.text(0, 0, f"{labels[0]}\n{values[0]}", ha='center', va='center', fontsize=16, fontweight='bold')
+            else:
+                ax1.text(0.5, 0.5, 'No data', ha='center', va='center', transform=ax1.transAxes, fontsize=14)
+            ax1.set_title('Processing Status Distribution', fontweight='bold')
+            
+            # Chart 2: Category Distribution (if data available)
+            categories = [c.complaint_category for c in complaints if c.complaint_category]
+            if categories:
+                category_counts = Counter(categories)
+                # Show top 5 categories
+                top_categories = category_counts.most_common(5)
+                category_names = [cat[0] for cat in top_categories]
+                category_values = [cat[1] for cat in top_categories]
+                
+                bars = ax2.bar(range(len(category_names)), category_values, color='skyblue', alpha=0.7)
+                ax2.set_title('Top Complaint Categories', fontweight='bold')
+                ax2.set_xlabel('Category')
+                ax2.set_ylabel('Number of Complaints')
+                ax2.set_xticks(range(len(category_names)))
+                ax2.set_xticklabels(category_names, rotation=45, ha='right')
+                ax2.grid(True, alpha=0.3)
+                
+                # Add value labels on bars
+                for bar, value in zip(bars, category_values):
+                    ax2.text(bar.get_x() + bar.get_width()/2, bar.get_height() + 0.1, 
+                            str(value), ha='center', va='bottom')
+            else:
+                ax2.text(0.5, 0.5, 'No category data available', ha='center', va='center', 
+                        transform=ax2.transAxes, fontsize=12)
+                ax2.set_title('Top Complaint Categories', fontweight='bold')
+            
+            plt.tight_layout()
+            
+            # Save the chart
+            filename = f'complaint_summary_{datetime.now().strftime("%Y%m%d_%H%M%S")}.png'
+            plt.savefig(filename, dpi=300, bbox_inches='tight')
+            print(f"✅ Chart saved as {filename}")
+            
+            # Show the plot
+            plt.show()
+            
+        except ImportError:
+            print("❌ Chart generation requires matplotlib. Please install it with: pip install matplotlib")
+        except Exception as e:
+            print(f"❌ Error generating chart: {e}")
 
     def show_sample_complaints(self, db):
         """Show sample complaints from the database"""
