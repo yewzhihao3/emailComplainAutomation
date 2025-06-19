@@ -59,20 +59,45 @@ class Database:
         finally:
             session.close()
 
+    def get_next_complaint_id(self):
+        """Get the next available complaint ID for sequential numbering"""
+        session = self.Session()
+        try:
+            # Get the highest complaint ID number
+            highest_id = session.query(Complaint.id).order_by(Complaint.id.desc()).first()
+            
+            if highest_id:
+                # Extract the number from the highest ID (e.g., "COMP-000123" -> 123)
+                try:
+                    current_number = int(highest_id[0].split('-')[1])
+                    next_number = current_number + 1
+                except (IndexError, ValueError):
+                    # If parsing fails, start from 1
+                    next_number = 1
+            else:
+                # No complaints in database, start from 1
+                next_number = 1
+            
+            return f"COMP-{next_number:06d}"
+        finally:
+            session.close()
+
     def add_complaint(self, complaint_data):
         session = self.Session()
         try:
-            # Check if complaint already exists
-            existing = session.query(Complaint).filter_by(id=complaint_data['id']).first()
+            # Check if complaint already exists by order_id (more reliable than id)
+            existing = None
+            if complaint_data.get('order_id'):
+                existing = session.query(Complaint).filter_by(order_id=complaint_data['order_id']).first()
+            
+            # If not found by order_id, check by id as fallback
+            if not existing:
+                existing = session.query(Complaint).filter_by(id=complaint_data['id']).first()
+            
             if existing:
-                # Update existing complaint
-                for key, value in complaint_data.items():
-                    if hasattr(existing, key):
-                        setattr(existing, key, value)
-                existing.processed = ProcessStatus.PENDING
-                existing.root_cause = None
-                existing.suggested_solution = None
-                existing.processed_at = None
+                # Update existing complaint with new data but preserve processing status
+                self.logger.info(f"Complaint with order_id {complaint_data.get('order_id')} already exists, skipping")
+                return "skipped"  # Return "skipped" to indicate existing complaint
             else:
                 # Create new complaint
                 complaint = Complaint(
@@ -91,12 +116,13 @@ class Database:
                     processed=ProcessStatus.PENDING
                 )
                 session.add(complaint)
-            session.commit()
-            return True
+                session.commit()
+                self.logger.info(f"Added new complaint {complaint_data['id']} to database")
+                return "added"  # Return "added" to indicate new complaint
         except Exception as e:
             session.rollback()
             self.logger.error(f"Error adding complaint: {e}")
-            return False
+            return False  # Return False to indicate error
         finally:
             session.close()
 
@@ -204,5 +230,34 @@ class Database:
         session = self.Session()
         try:
             return session.query(Complaint).all()
+        finally:
+            session.close()
+
+    def get_database_stats(self):
+        """Get statistics about the complaints database"""
+        session = self.Session()
+        try:
+            total_complaints = session.query(Complaint).count()
+            pending_complaints = session.query(Complaint).filter_by(processed=ProcessStatus.PENDING).count()
+            successful_complaints = session.query(Complaint).filter_by(processed=ProcessStatus.SUCCESSFUL).count()
+            failed_complaints = session.query(Complaint).filter_by(processed=ProcessStatus.FAILED).count()
+            
+            return {
+                'total': total_complaints,
+                'pending': pending_complaints,
+                'successful': successful_complaints,
+                'failed': failed_complaints,
+                'processed_percentage': round((successful_complaints + failed_complaints) / total_complaints * 100, 2) if total_complaints > 0 else 0
+            }
+        finally:
+            session.close()
+
+    def get_complaint_by_order_id(self, order_id):
+        """Get a complaint by order_id"""
+        if not order_id:
+            return None
+        session = self.Session()
+        try:
+            return session.query(Complaint).filter_by(order_id=order_id).first()
         finally:
             session.close() 

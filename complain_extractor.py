@@ -1,7 +1,6 @@
 import gspread
 from oauth2client.service_account import ServiceAccountCredentials
 from datetime import datetime
-import uuid
 import json
 
 # Set up the scope and credentials
@@ -15,7 +14,7 @@ def get_google_sheets_client():
     creds = ServiceAccountCredentials.from_json_keyfile_name("credentials.json", scope)
     return gspread.authorize(creds)
 
-def get_complaints_data():
+def get_complaints_data(db_instance=None):
     """Fetch and format complaints data from Google Sheets"""
     client = get_google_sheets_client()
     sheet = client.open("Email Complaint (Responses)").sheet1
@@ -25,24 +24,54 @@ def get_complaints_data():
         "complaints": []
     }
     
-    for record in data:
-        complaint_id = f"COMP-{str(uuid.uuid4())[:8]}"
-        # Map fields from Google Sheet to database fields
-        complaint = {
-            "id": complaint_id,
-            "name": record.get("Name ", ""),
-            "email": record.get("Email", ""),
-            "contact_number": record.get("Contact Number", ""),
-            "order_id": record.get("Order ID / Reference No.  ", ""),
-            "product_name": record.get("Product Name / Batch No.  ", ""),
-            "purchase_date": record.get("Date of Purchase / Delivery  ", ""),
-            "complaint_category": record.get("Complaint Category  ", ""),
-            "description": record.get("Detailed Description  ", ""),
-            "photo_proof_link": record.get("Upload photo/video proof (via Google Drive link)  ", ""),
-            "importance_level": None,  # To be filled by AI
-            "received_at": datetime.now().isoformat()
-        }
-        formatted_complaints["complaints"].append(complaint)
+    # Start complaint ID from 1 or get next available ID from database
+    if db_instance:
+        # Get the starting ID from database for sequential numbering
+        starting_id = db_instance.get_next_complaint_id()
+        # Extract the starting number
+        try:
+            starting_number = int(starting_id.split('-')[1])
+        except (IndexError, ValueError):
+            starting_number = 1
+        
+        for i, record in enumerate(data):
+            complaint_id = f"COMP-{(starting_number + i):06d}"  # Increment sequentially
+            # Map fields from Google Sheet to database fields
+            complaint = {
+                "id": complaint_id,
+                "name": record.get("Name ", ""),
+                "email": record.get("Email", ""),
+                "contact_number": record.get("Contact Number", ""),
+                "order_id": record.get("Order ID / Reference No.  ", ""),
+                "product_name": record.get("Product Name / Batch No.  ", ""),
+                "purchase_date": record.get("Date of Purchase / Delivery  ", ""),
+                "complaint_category": record.get("Complaint Category  ", ""),
+                "description": record.get("Detailed Description  ", ""),
+                "photo_proof_link": record.get("Upload photo/video proof (via Google Drive link)  ", ""),
+                "importance_level": None,  # To be filled by AI
+                "received_at": datetime.now().isoformat()
+            }
+            formatted_complaints["complaints"].append(complaint)
+    else:
+        # Fallback to simple counter if no database instance provided
+        for i, record in enumerate(data):
+            complaint_id = f"COMP-{(i + 1):06d}"  # Format as COMP-000001, COMP-000002, etc.
+            # Map fields from Google Sheet to database fields
+            complaint = {
+                "id": complaint_id,
+                "name": record.get("Name ", ""),
+                "email": record.get("Email", ""),
+                "contact_number": record.get("Contact Number", ""),
+                "order_id": record.get("Order ID / Reference No.  ", ""),
+                "product_name": record.get("Product Name / Batch No.  ", ""),
+                "purchase_date": record.get("Date of Purchase / Delivery  ", ""),
+                "complaint_category": record.get("Complaint Category  ", ""),
+                "description": record.get("Detailed Description  ", ""),
+                "photo_proof_link": record.get("Upload photo/video proof (via Google Drive link)  ", ""),
+                "importance_level": None,  # To be filled by AI
+                "received_at": datetime.now().isoformat()
+            }
+            formatted_complaints["complaints"].append(complaint)
     
     return formatted_complaints
 
