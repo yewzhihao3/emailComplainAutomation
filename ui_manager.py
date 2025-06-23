@@ -235,13 +235,19 @@ class UIManager:
             print(f"  ID: {complaint.id}")
             print(f"  Order ID: {complaint.order_id}")
             print(f"  Name: {complaint.name}")
+            print(f"  Email: {complaint.email}")
+            print(f"  Contact Number: {complaint.contact_number}")
+            print(f"  Product: {complaint.product_name}")
+            print(f"  Purchase Date: {complaint.purchase_date}")
             print(f"  Category: {complaint.complaint_category}")
-            print(f"  Status: {complaint.processed.value}")
+            print(f"  Description: {complaint.description}")
+            print(f"  Photo Proof Link: {complaint.photo_proof_link}")
             print(f"  Importance: {complaint.importance_level.value if complaint.importance_level else 'Unknown'}")
-            if complaint.processed_at:
-                print(f"  Processed at: {complaint.processed_at}")
-            if complaint.root_cause:
-                print(f"  Root Cause: {complaint.root_cause[:100]}...")
+            print(f"  Received At: {complaint.received_at}")
+            print(f"  Status: {complaint.processed.value}")
+            print(f"  Processed at: {complaint.processed_at}")
+            print(f"  Root Cause: {complaint.root_cause}")
+            print(f"  Suggested Solution: {complaint.suggested_solution}")
             print("-" * 30)
         
         # Ask if user wants to search for a specific complaint
