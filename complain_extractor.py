@@ -6,6 +6,13 @@ import pandas as pd
 from datetime import datetime
 import logging
 import json
+import sys
+
+def resource_path(relative_path):
+    """Get absolute path to resource, works for dev and for PyInstaller"""
+    if hasattr(sys, '_MEIPASS'):
+        return os.path.join(sys._MEIPASS, relative_path)
+    return os.path.join(os.path.abspath("."), relative_path)
 
 def get_complaints_data(db_instance=None):
     """
@@ -21,7 +28,7 @@ def get_complaints_data(db_instance=None):
     
     # Define the scope and credentials file path
     scope = ['https://spreadsheets.google.com/feeds', 'https://www.googleapis.com/auth/drive']
-    credentials_path = os.path.join(config_folder, "credentials.json")
+    credentials_path = resource_path(os.path.join(config_folder, "credentials.json"))
     
     try:
         # Check if credentials file exists

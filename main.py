@@ -11,13 +11,19 @@ import os
 import sys
 from dotenv import load_dotenv
 
+def resource_path(relative_path):
+    """Get absolute path to resource, works for dev and for PyInstaller"""
+    if hasattr(sys, '_MEIPASS'):
+        return os.path.join(sys._MEIPASS, relative_path)
+    return os.path.join(os.path.abspath("."), relative_path)
+
 # Load environment variables - handle both development and frozen executable
 def load_env_file():
     """Load .env file from appropriate location based on environment"""
     # Try multiple possible locations for the .env file
     possible_paths = [
-        'config/.env',           # Development environment
-        '.env',                  # Root directory fallback
+        resource_path('config/.env'),           # Development or bundled
+        resource_path('.env'),                  # Root directory fallback
         os.path.join(os.path.dirname(sys.executable), 'config', '.env'),  # Frozen executable
         os.path.join(os.path.dirname(sys.executable), '.env'),            # Frozen executable fallback
     ]
