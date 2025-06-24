@@ -46,6 +46,7 @@ def setup_logging():
     logs_folder = "logs"
     if not os.path.exists(logs_folder):
         os.makedirs(logs_folder)
+        print(f"📁 Created logs folder at: {os.path.abspath(logs_folder)}")
     
     # Use a single log file with rotation instead of timestamp-based naming
     log_filename = os.path.join(logs_folder, 'complaint_analysis.log')

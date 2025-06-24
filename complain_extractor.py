@@ -25,6 +25,7 @@ def get_complaints_data(db_instance=None):
     if not os.path.exists(config_folder):
         os.makedirs(config_folder)
         logger.info(f"Created config folder: {config_folder}")
+        print(f"📁 Created config folder at: {os.path.abspath(config_folder)}")
     
     # Define the scope and credentials file path
     scope = ['https://spreadsheets.google.com/feeds', 'https://www.googleapis.com/auth/drive']

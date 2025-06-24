@@ -12,3 +12,5 @@ matplotlib
 seaborn
 numpy
 pyinstaller
+py2app
+dotenv
